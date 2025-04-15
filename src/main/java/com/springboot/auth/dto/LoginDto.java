@@ -6,5 +6,5 @@ import lombok.Getter;
 // 로그인에 필요한 DTO
 public class LoginDto {
     private String username;
-//    private String password = "";
+    private String password;
 }

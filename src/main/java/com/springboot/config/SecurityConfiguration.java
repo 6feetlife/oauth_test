@@ -19,6 +19,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -44,15 +45,17 @@ public class SecurityConfiguration {
     private final MemberDetailService memberDetailService;
     private final RedisTemplate<String, Object> redisTemplate;
     private String clientId;
+    private final MemberRepository memberRepository;
 
 
 
     public SecurityConfiguration(JwtTokenizer jwtTokenizer, CustomAuthorityUtils authorityUtils,
-                                 MemberDetailService memberDetailService, RedisTemplate<String, Object> redisTemplate) {
+                                 MemberDetailService memberDetailService, RedisTemplate<String, Object> redisTemplate, MemberRepository memberRepository) {
         this.jwtTokenizer = jwtTokenizer;
         this.authorityUtils = authorityUtils;
         this.memberDetailService = memberDetailService;
         this.redisTemplate = redisTemplate;
+        this.memberRepository = memberRepository;
     }
 
     @Bean
@@ -87,7 +90,7 @@ public class SecurityConfiguration {
                 // 모든 요청에 대해 인증 없이 접근 가능
                 // 여러개의 요청에 대한 권한 정의가 가능하다
                 .authorizeHttpRequests(authorize -> authorize
-                        .antMatchers("/jwt/login", "/oauth/login").permitAll()
+                        .antMatchers("/auth/login", "/oauth/login").permitAll()
                         .antMatchers("/logout").permitAll()
                         // 접근 권한과 상관없이 post 요청이라면 허용한다
                         .antMatchers(HttpMethod.POST, "/*/members").permitAll()
@@ -163,28 +166,33 @@ public class SecurityConfiguration {
             AuthenticationManager authenticationManager = builder.getSharedObject(AuthenticationManager.class);
             // 인증 과정에서 RedisTemplate을 사용하기 위해 RedisTemplate 생성자에 전달
             JwtVerificationFilter jwtVerificationFilter = new JwtVerificationFilter(jwtTokenizer, authorityUtils, redisTemplate, memberDetailService);
-            JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(authenticationManager, jwtTokenizer, redisTemplate);
-            jwtAuthenticationFilter.setFilterProcessesUrl("/jwt/login");
+            JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(authenticationManager, jwtTokenizer, redisTemplate, memberRepository);
+            jwtAuthenticationFilter.setFilterProcessesUrl("/auth/login");
 
             // OAuthAuthenticationFilter 등록
             OAuthAuthenticationFilter oAuthAuthenticationFilter = new OAuthAuthenticationFilter("/oauth/login", authenticationManager);
 
-            builder.addFilter(oAuthAuthenticationFilter);
+//            builder.addFilter(oAuthAuthenticationFilter);
+            builder.addFilterBefore(oAuthAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
             builder.addFilterAfter(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
             builder.addFilterAfter(jwtVerificationFilter, UsernamePasswordAuthenticationFilter.class); // (1)
-//            builder.addFilterBefore(oAuthAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         }
     }
+//    @Bean
+//    public OAuthAuthenticationProvider oAuthAuthenticationProvider(MemberRepository memberRepository) {
+//        return new OAuthAuthenticationProvider(memberRepository);
+//    }
 
-    @Bean
-    public OAuthAuthenticationProvider oAuthAuthenticationProvider(MemberRepository memberRepository) {
-        return new OAuthAuthenticationProvider(memberRepository);
-    }
+//    @Bean
+//    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+//        AuthenticationManagerBuilder builder = http.getSharedObject(AuthenticationManagerBuilder.class);
+//        builder.authenticationProvider(new OAuthAuthenticationProvider(memberRepository));
+//        return builder.build();
+//    }
+//    @Bean
+//    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+//        return config.getAuthenticationManager();
+//    }
 
-    @Bean
-    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
-        return http.getSharedObject(AuthenticationManagerBuilder.class)
-                .authenticationProvider(oAuthAuthenticationProvider(http.getSharedObject(MemberRepository.class)))
-                .build();
-    }
 }

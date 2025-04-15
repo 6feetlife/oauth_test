@@ -57,6 +57,7 @@ public class NoticeDto {
 
         @Schema(description = "공지사항 고정여부", example = "PINNED")
         private Notice.IsPinned isPinned;
+
     }
 
     @Getter

@@ -33,9 +33,12 @@ public class Category extends BaseEntity {
     @JoinColumn(name = "member_id")
     private Member member;
 
+    //기본 카테고리 여부 등록(수정 및 삭제 금지)
+    // ture = 기본 카테고리(삭제&수정 불가)
+    // false = 커스텀 카테고리 (삭제&수정 가능)
+    @Column(nullable = false)
+    private boolean isDefault = false;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.PERSIST)
-    private List<Record> records = new ArrayList<>();
 
     // member 영속성
     public void setMember(Member member) {
@@ -45,13 +48,11 @@ public class Category extends BaseEntity {
         }
     }
 
-    // record 영속성
-    public void setRecord(Record record) {
-        if(record.getCategory() != this) {
-            record.setCategory(this);
-        }
-        if(!this.records.contains(record)) {
-            records.add(record);
-        }
+    public Category(String name, String image, Member member, boolean isDefault) {
+        this.name = name;
+        this.image = image;
+        this.member = member;
+        this.isDefault = isDefault;
     }
+
 }

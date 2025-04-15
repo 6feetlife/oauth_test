@@ -3,6 +3,7 @@ package com.springboot.oauth;
 import com.springboot.member.entity.Member;
 import com.springboot.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.stream.Collectors;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class OAuthAuthenticationProvider implements AuthenticationProvider {
@@ -22,6 +24,10 @@ public class OAuthAuthenticationProvider implements AuthenticationProvider {
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         // 인증정보에서 principal 가져오기 = email
         String email = (String) authentication.getPrincipal();
+
+        // ✅ 로그 추가 위치
+        log.info("✅ OAuthAuthenticationProvider 호출됨 - 이메일: {}", email);
+
 
         // principal 에서 가져온 email 로 member 찾기
         Member member = memberRepository.findByEmail(email)
@@ -40,6 +46,8 @@ public class OAuthAuthenticationProvider implements AuthenticationProvider {
     public boolean supports(Class<?> authentication) {
         // 파라미터로 받는 authentication 이 OAuthAuthenticationToken.class 이거나
         // 그 하위 클래스라면 true 반환
-        return OAuthAuthenticationToken.class.isAssignableFrom(authentication);
+        boolean result = OAuthAuthenticationToken.class.isAssignableFrom(authentication);
+        log.info("🧪 supports() 결과: {}, 타입: {}", result, authentication.getName());
+        return result;
     }
 }

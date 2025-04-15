@@ -1,14 +1,19 @@
 package com.springboot.member.service;
 
+import com.springboot.auth.service.GoogleOAuthService;
 import com.springboot.auth.utils.CustomAuthorityUtils;
 import com.springboot.auth.utils.MemberDetails;
+import com.springboot.category.entity.Category;
+import com.springboot.category.repository.CategoryRepository;
 import com.springboot.exception.BusinessLogicException;
 import com.springboot.exception.ExceptionCode;
 import com.springboot.member.entity.DeletedMember;
 import com.springboot.member.entity.Member;
 import com.springboot.member.repository.DeletedMemberRepository;
 import com.springboot.member.repository.MemberRepository;
+import com.springboot.oauth.GoogleInfoDto;
 import com.springboot.question.entity.Question;
+import com.springboot.record.entity.Record;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -19,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,11 +33,13 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final CustomAuthorityUtils authorityUtils;
     private final DeletedMemberRepository deletedMemberRepository;
+    private final CategoryRepository categoryRepository;
+    private final GoogleOAuthService googleOAuthService;
 
     @Value("${mail.address.admin}")
     private String adminEmail;
 
-    public Member createMember(Member member) {
+    public Map<String, String> createMember(Member member) {
         // 중복된 회원인지 이메일로 검증
         isMemberAlreadyRegistered(member.getEmail());
         // 중복된 닉네임인지 검증
@@ -41,8 +49,17 @@ public class MemberService {
 
         List<String> roles = authorityUtils.createRoles(member.getEmail());
         member.setRoles(roles);
+        List<Record> records = new ArrayList<>();
+        List<String> categoryNames = List.of("일상", "소비", "건강", "할 일", "기타");
+        List<Category> categoryList = categoryNames.stream()
+                .map(categoryName -> new Category(categoryName, "url", member,true))
+                        .collect(Collectors.toList());
+        categoryList.stream().map(category -> categoryRepository.save(category));
 
-        return memberRepository.save(member);
+        member.setCategories(categoryList);
+        memberRepository.save(member);
+
+        return googleOAuthService.processUserLogin(new GoogleInfoDto(member.getEmail(),member.getName()));
     }
 
     public Member updateMember(Member member, int memberId, MemberDetails memberDetails) {
@@ -61,15 +78,9 @@ public class MemberService {
             findMember.setProfile(
                     Optional.ofNullable(member.getProfile())
                             .orElse(findMember.getProfile()));
-            findMember.setName(
-                    Optional.ofNullable(member.getName())
-                            .orElse(findMember.getName()));
             findMember.setRegion(
                     Optional.ofNullable(member.getRegion())
                             .orElse(findMember.getRegion()));
-            findMember.setName(
-                    Optional.ofNullable(member.getName())
-                            .orElse(findMember.getName()));
             findMember.setBirth(
                     Optional.ofNullable(member.getBirth())
                             .orElse(findMember.getBirth()));
@@ -112,7 +123,7 @@ public class MemberService {
         Sort.Direction direction = order.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
 
         // 페이지네이션 양식 생성
-        Pageable pageable =  PageRequest.of(page, size, Sort.by(direction, sortBy));;
+        Pageable pageable =  PageRequest.of(page, size, Sort.by(direction, sortBy));
 
         // 값이 존재하는 값의 키로 벨류를 조회하여 설정
         Page<Member> members;
@@ -234,5 +245,14 @@ public class MemberService {
         Optional<Member> findMember = memberRepository.findByEmail(email);
         // 존재하는 유저라면 true 존재하지 않는다면 false 리턴
         return findMember.isPresent();
+    }
+
+    //검증 로직 : 회원가입 직후에 사용자에게 앱 푸쉬알림 허용 여부 받기
+    public void updateNotificationConsent(long memberId, boolean notification) {
+        Member findMember = validateExistingMember(memberId);
+
+        findMember.setNotification(notification);
+        //저장
+        memberRepository.save(findMember);
     }
 }

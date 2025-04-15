@@ -52,6 +52,9 @@ public class Member extends BaseEntity {
     @Column(nullable = false)
     private boolean notification;
 
+    @Column
+    private String refreshToken;
+
     @ElementCollection(fetch = FetchType.EAGER)
     private List<String> roles = new ArrayList<>();
 
@@ -75,6 +78,7 @@ public class Member extends BaseEntity {
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.PERSIST)
     private List<Keyword> keywords = new ArrayList<>();
+
 
     public enum MemberStatus {
         MEMBER_ACTIVE("활동 중"),
